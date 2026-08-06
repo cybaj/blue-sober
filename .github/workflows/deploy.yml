@@ -21,9 +21,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Version comes from .nvmrc so local and CI cannot drift apart. A
+      # mismatch resolves optional dependencies differently and can fail
+      # `npm ci` on entries that install fine locally.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci
