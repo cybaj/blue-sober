@@ -1,0 +1,64 @@
+@import "./tokens.css";
+
+/* Both @font-face stylesheets live in public/fonts/ and are linked from the
+   layout — see scripts/sync-fonts.mjs. Inter carries Latin; because it has no
+   Hangul glyphs, the browser falls through to Pretendard per glyph. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--surface-page-canvas);
+  color: var(--color-editorial-black);
+  font-family: var(--font-sans);
+  font-size: var(--text-body-relaxed);
+  line-height: var(--leading-body-relaxed);
+  font-weight: var(--font-weight-regular);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Single left-aligned column inside a 720px page container. */
+.page {
+  max-width: var(--page-max-width);
+  margin: 0 auto;
+  padding: 0 var(--spacing-24) var(--section-gap);
+}
+
+a {
+  color: inherit;
+}
+
+/* Quiet footnote, not a button — the reference's text link. */
+.link {
+  color: var(--color-soft-graphite);
+  text-decoration: none;
+  font-size: var(--text-body-relaxed);
+  font-weight: var(--font-weight-regular);
+  transition: color 120ms ease;
+}
+
+.link:hover,
+.link:focus-visible {
+  color: var(--color-editorial-black);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-charcoal-ink);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

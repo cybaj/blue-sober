@@ -1,0 +1,28 @@
+---
+import Base from '../layouts/Base.astro';
+import Entry from '../components/Entry.astro';
+import { getDiaryEntries } from '../lib/entries';
+
+const entries = await getDiaryEntries();
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+---
+
+<Base title="blue sober">
+  <div class="entries">
+    {
+      entries.map((entry) => (
+        <Entry entry={entry} href={`${base}${entry.id}/`} />
+      ))
+    }
+  </div>
+</Base>
+
+<style>
+  /* A continuous vertical essay — entries separated by whitespace alone.
+     No rules, no cards, no borders. */
+  .entries {
+    display: flex;
+    flex-direction: column;
+    gap: var(--section-gap);
+  }
+</style>

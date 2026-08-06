@@ -1,0 +1,27 @@
+---
+// Thin transparent bar. Wordmark left, nothing else — the reference's header
+// carries a status badge and a nav link, neither of which a diary needs.
+const base = import.meta.env.BASE_URL;
+---
+
+<header class="header">
+  <a class="wordmark" href={base}>blue sober</a>
+</header>
+
+<style>
+  .header {
+    display: flex;
+    align-items: center;
+    height: var(--header-height);
+    margin-bottom: var(--spacing-40);
+  }
+
+  .wordmark {
+    font-size: var(--text-caption);
+    line-height: var(--leading-caption);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-charcoal-ink);
+    text-decoration: none;
+    letter-spacing: -0.01em;
+  }
+</style>

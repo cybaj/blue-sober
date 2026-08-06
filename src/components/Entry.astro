@@ -1,0 +1,98 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { render } from 'astro:content';
+import Marker from './Marker.astro';
+import { formatEntryDate, isoDate } from '../lib/date';
+
+interface Props {
+  entry: CollectionEntry<'diary'>;
+  /** When set, the title links here. Omitted on the entry's own page. */
+  href?: string;
+  /** h1 on a permalink page, h2 when stacked on the index. */
+  headingLevel?: 'h1' | 'h2';
+}
+
+const { entry, href, headingLevel = 'h2' } = Astro.props;
+const { title, date, place } = entry.data;
+const { Content } = await render(entry);
+
+const Heading = headingLevel;
+---
+
+<article class="entry">
+  <Heading class="title">
+    {href ? <a href={href}>{title}</a> : title}
+  </Heading>
+
+  <p class="meta">
+    <time datetime={isoDate(date)}>{formatEntryDate(date)}</time>
+    {place && <><span class="dot">·</span>{place}</>}
+  </p>
+
+  <div class="verse">
+    <Content />
+  </div>
+
+  <Marker />
+</article>
+
+<style>
+  .entry {
+    max-width: var(--text-column-width);
+  }
+
+  .title {
+    font-size: clamp(28px, 7vw, var(--text-heading));
+    line-height: var(--leading-heading);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-editorial-black);
+    margin: 0;
+    letter-spacing: -0.02em;
+  }
+
+  .title a {
+    text-decoration: none;
+    transition: color 120ms ease;
+  }
+
+  .title a:hover {
+    color: var(--color-charcoal-ink);
+  }
+
+  .meta {
+    font-size: var(--text-caption);
+    line-height: var(--leading-caption);
+    color: var(--color-soft-graphite);
+    margin: var(--spacing-8) 0 0;
+  }
+
+  .dot {
+    margin: 0 var(--spacing-8);
+    color: var(--color-faded-pencil);
+  }
+
+  /* The verse. Uniform weight and color throughout — deciding which of the
+     author's lines should recede is not typography's call. Line breaks come
+     from remark-breaks; see astro.config.mjs. */
+  .verse {
+    margin-top: var(--spacing-32);
+    font-size: var(--text-body-relaxed);
+    line-height: var(--leading-body-relaxed);
+    font-weight: var(--font-weight-regular);
+    color: var(--color-editorial-black);
+    overflow-wrap: break-word;
+  }
+
+  .verse :global(p) {
+    margin: 0 0 var(--spacing-24);
+  }
+
+  .verse :global(p:last-child) {
+    margin-bottom: 0;
+  }
+
+  /* The gradient square closes the entry. */
+  .entry :global(.marker) {
+    margin-top: var(--spacing-32);
+  }
+</style>

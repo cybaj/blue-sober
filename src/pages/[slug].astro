@@ -1,0 +1,31 @@
+---
+import type { GetStaticPaths } from 'astro';
+import Base from '../layouts/Base.astro';
+import Entry from '../components/Entry.astro';
+import { getDiaryEntries } from '../lib/entries';
+
+export const getStaticPaths: GetStaticPaths = async () => {
+  const entries = await getDiaryEntries();
+  return entries.map((entry) => ({
+    params: { slug: entry.id },
+    props: { entry },
+  }));
+};
+
+const { entry } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+---
+
+<Base title={`${entry.data.title} — blue sober`}>
+  <Entry entry={entry} headingLevel="h1" />
+  <p class="back">
+    <a class="link" href={base}>← 목록</a>
+  </p>
+</Base>
+
+<style>
+  .back {
+    margin-top: var(--section-gap);
+    font-size: var(--text-caption);
+  }
+</style>

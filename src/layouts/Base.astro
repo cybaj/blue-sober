@@ -1,0 +1,43 @@
+---
+import Header from '../components/Header.astro';
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = '일기' } = Astro.props;
+// Normalized to always end in a slash so `${base}fonts/…` is correct whether
+// the site deploys to a project path or a domain root.
+const base = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+const canonical = new URL(Astro.url.pathname, Astro.site);
+---
+
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonical} />
+
+    <link rel="stylesheet" href={`${base}fonts/pretendard/pretendard.css`} />
+    <link rel="stylesheet" href={`${base}fonts/inter.css`} />
+  </head>
+
+  <body>
+    <div class="page">
+      <Header />
+      <main>
+        <slot />
+      </main>
+    </div>
+  </body>
+</html>
