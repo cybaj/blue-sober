@@ -2,6 +2,7 @@
 import { defineConfig } from 'astro/config';
 import { unified } from '@astrojs/markdown-remark';
 import remarkBreaks from 'remark-breaks';
+import { remarkYouTube } from './plugins/youtube.mjs';
 
 // GitHub Pages. For a PROJECT site (cybaj.github.io/blue-sober) keep `base`.
 // For a USER site (cybaj.github.io) delete the `base` line entirely.
@@ -16,7 +17,9 @@ export default defineConfig({
     // The diary is free verse — a single newline is a line break, not filler.
     // Without this every poem collapses into one paragraph.
     processor: unified({
-      remarkPlugins: [remarkBreaks],
+      // remarkYouTube must follow remarkBreaks: it identifies a line by the
+      // `break` nodes that plugin inserts.
+      remarkPlugins: [remarkBreaks, remarkYouTube],
       // Straight quotes and dashes are left exactly as written.
       smartypants: false,
     }),

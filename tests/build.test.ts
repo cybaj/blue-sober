@@ -123,6 +123,48 @@ describe('routing', () => {
   });
 });
 
+describe('youtube embeds', () => {
+  /** Source files that put a YouTube URL alone on a line. */
+  async function entriesWithVideo(): Promise<string[]> {
+    const hits: string[] = [];
+    for (const file of await diaryFiles()) {
+      const source = await readFile(join(diaryDir, file), 'utf8');
+      const body = source.split(/^---$/m).slice(2).join('---');
+      const standalone = body
+        .split('\n')
+        .some((l) => /^\s*https?:\/\/\S*(youtube\.com|youtu\.be)\S*\s*$/.test(l));
+      if (standalone) hits.push(file);
+    }
+    return hits;
+  }
+
+  it('embeds a player for every entry with a standalone YouTube URL', async () => {
+    const withVideo = await entriesWithVideo();
+    if (withVideo.length === 0) {
+      // No entry uses one yet. The parser itself is covered by youtube.test.ts;
+      // this activates the moment a diary entry includes a video.
+      expect(withVideo).toEqual([]);
+      return;
+    }
+
+    for (const dir of entryDirs) {
+      const html = await readFile(join(dist, dir, 'index.html'), 'utf8');
+      if (!/youtube\.com|youtu\.be/.test(html)) continue;
+      expect(html).toContain('youtube-nocookie.com/embed/');
+      expect(html).toContain('loading="lazy"');
+    }
+  });
+
+  it('never emits a block element that would split the verse paragraph', async () => {
+    for (const dir of entryDirs) {
+      const html = await readFile(join(dist, dir, 'index.html'), 'utf8');
+      // A <div> inside the single verse <p> would terminate the paragraph and
+      // scatter the poem's line breaks.
+      expect(html).not.toContain('<div class="youtube"');
+    }
+  });
+});
+
 describe('assets', () => {
   it('links both font stylesheets under the configured base', () => {
     expect(indexHtml).toMatch(

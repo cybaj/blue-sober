@@ -27,6 +27,25 @@ field fails the build rather than publishing something wrong.
 Single newlines are preserved as line breaks, so free verse keeps its shape —
 no trailing double-spaces needed. Entries are ordered by `date`, newest first.
 
+## YouTube
+
+Put a YouTube URL alone on its own line and it becomes an embedded player:
+
+```markdown
+유튜브를 켜놓고 자주 말들 재생했었다.
+https://youtu.be/dQw4w9WgXcQ
+얼만큼은 음악을 오랫동안 듣겠다.
+```
+
+A URL that appears *within* a line stays an ordinary link, so you can quote one
+without embedding it.
+
+Recognised forms: `watch?v=`, `youtu.be/`, `shorts/`, `live/`, and `embed/`. A
+start time carries over — `?t=90`, `?t=1m30s`, and `?start=90` all work.
+Channel, playlist, and search URLs are left as plain links.
+
+Embeds use `youtube-nocookie.com`, are lazy-loaded, and never autoplay.
+
 ## Commands
 
 | Command | Effect |
