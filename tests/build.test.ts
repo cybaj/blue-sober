@@ -10,6 +10,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { parseYouTube } from '../plugins/youtube.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const dist = join(root, 'dist');
@@ -37,50 +38,114 @@ async function diaryFiles(): Promise<string[]> {
   return files.filter((f) => f.endsWith('.md'));
 }
 
+/** Visible text of a fragment, with tags dropped and entities decoded. */
+function textOf(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
+interface Entry {
+  /** Source filename in diary/. */
+  file: string;
+  /** Built directory in dist/. */
+  dir: string;
+  html: string;
+  /** Inner HTML of the entry's verse block. */
+  verse: string;
+  /** Non-blank body lines from the source. */
+  lines: string[];
+}
+
+/**
+ * Pairs every diary source file with the page it produced.
+ *
+ * Pairing matters: reading dist/ and diary/ as two independent lists and
+ * indexing both by position silently compares one entry's page against
+ * another entry's source as soon as there is more than one entry.
+ */
+async function loadEntries(): Promise<Entry[]> {
+  const dirs = await entryPageDirs();
+  const files = await diaryFiles();
+
+  return Promise.all(
+    files.map(async (file) => {
+      const slug = file.replace(/\.md$/, '');
+      const dir =
+        dirs.find((d) => d === slug) ??
+        dirs.find((d) => d.toLowerCase() === slug.toLowerCase());
+
+      if (!dir) {
+        throw new Error(
+          `no built page for ${file} — expected "${slug}" among: ${dirs.join(', ')}`,
+        );
+      }
+
+      const html = await readFile(join(dist, dir, 'index.html'), 'utf8');
+      const verse =
+        html.match(/<div class="verse"[^>]*>([\s\S]*?)<\/div>/)?.[1] ?? '';
+
+      const source = await readFile(join(diaryDir, file), 'utf8');
+      const body = source.split(/^---$/m).slice(2).join('---').trim();
+      const lines = body.split('\n').filter((l) => l.trim() !== '');
+
+      return { file, dir, html, verse, lines };
+    }),
+  );
+}
+
 let indexHtml: string;
 let entryDirs: string[];
+let entries: Entry[];
 
 beforeAll(async () => {
   indexHtml = await readFile(join(dist, 'index.html'), 'utf8');
   entryDirs = await entryPageDirs();
+  entries = await loadEntries();
 });
 
 describe('verse rendering', () => {
-  it('preserves every line of a poem as a line break', async () => {
-    const html = await readFile(
-      join(dist, entryDirs[0]!, 'index.html'),
-      'utf8',
-    );
-    const verse = html.match(/<div class="verse"[^>]*>([\s\S]*?)<\/div>/)?.[1];
-    expect(verse, 'verse block should exist').toBeDefined();
-
-    const source = await readFile(
-      join(diaryDir, (await diaryFiles())[0]!),
-      'utf8',
-    );
-    const body = source.split(/^---$/m).slice(2).join('---').trim();
-    const sourceLines = body.split('\n').filter((l) => l.trim() !== '');
-
-    // n lines of unbroken verse must yield n-1 <br> elements. If Markdown ever
-    // collapses newlines again, this drops to 0 and the test fails loudly.
-    const breaks = verse!.match(/<br\s*\/?>/g) ?? [];
-    expect(breaks.length).toBe(sourceLines.length - 1);
+  it('has a verse block on every entry page', () => {
+    for (const e of entries) {
+      expect(e.verse, `${e.file} has no verse block`).not.toBe('');
+    }
   });
 
-  it('renders the first and last line of the source', async () => {
-    const html = await readFile(
-      join(dist, entryDirs[0]!, 'index.html'),
-      'utf8',
-    );
-    const source = await readFile(
-      join(diaryDir, (await diaryFiles())[0]!),
-      'utf8',
-    );
-    const body = source.split(/^---$/m).slice(2).join('---').trim();
-    const lines = body.split('\n').filter((l) => l.trim() !== '');
+  it('preserves every line of a poem as a line break', () => {
+    for (const e of entries) {
+      const breaks = e.verse.match(/<br\s*\/?>/g) ?? [];
+      const paragraphs = (e.verse.match(/<p[\s>]/g) ?? []).length;
 
-    expect(html).toContain(lines[0]!.trim());
-    expect(html).toContain(lines[lines.length - 1]!.trim());
+      // Within a paragraph each newline is a <br>, so n lines across p
+      // paragraphs yield n - p breaks. If Markdown ever collapses newlines
+      // again this drops toward zero and fails loudly.
+      expect(breaks.length, `${e.file}`).toBe(e.lines.length - paragraphs);
+    }
+  });
+
+  it('renders every source line, as text or as an embed', () => {
+    for (const e of entries) {
+      const visible = textOf(e.verse);
+
+      for (const line of e.lines) {
+        const trimmed = line.trim();
+        const video = parseYouTube(trimmed);
+
+        if (video) {
+          // A standalone YouTube URL is deliberately replaced by a player,
+          // so the raw URL is absent from the output by design.
+          expect(e.verse, `${e.file}: ${trimmed}`).toContain(
+            `/embed/${video.id}`,
+          );
+        } else {
+          expect(visible, `${e.file}: ${trimmed}`).toContain(trimmed);
+        }
+      }
+    }
   });
 });
 
@@ -92,17 +157,18 @@ describe('entry metadata', () => {
     expect(indexHtml).toContain('춘천');
   });
 
-  it('gives the date a machine-readable datetime', () => {
+  it('gives every entry a machine-readable datetime', () => {
     const times = indexHtml.match(/<time datetime="(\d{4}-\d{2}-\d{2})"/g) ?? [];
-    expect(times.length).toBeGreaterThan(0);
+    expect(times.length).toBe(entries.length);
   });
 
   it('does not repeat the title inside the verse body', () => {
     // The H1 and date line were lifted into frontmatter; if they leak back
     // into the body they would render twice.
-    const verse = indexHtml.match(/<div class="verse"[^>]*>([\s\S]*?)<\/div>/)?.[1];
-    expect(verse).not.toContain('<h1');
-    expect(verse).not.toContain('2026.06.08');
+    for (const e of entries) {
+      expect(e.verse, e.file).not.toContain('<h1');
+      expect(e.verse, e.file).not.toContain('<h2');
+    }
   });
 });
 
@@ -112,7 +178,7 @@ describe('routing', () => {
     expect(entryDirs.length).toBe(files.length);
   });
 
-  it('links every entry from the index', async () => {
+  it('links every entry from the index', () => {
     // Hrefs are written with literal Hangul, not percent-encoded. The base
     // prefix is left unasserted so switching to a user site doesn't fail here.
     for (const dir of entryDirs) {
@@ -121,46 +187,37 @@ describe('routing', () => {
       );
     }
   });
+
+  it('orders entries newest first on the index', () => {
+    const dates = [...indexHtml.matchAll(/<time datetime="([\d-]+)"/g)].map(
+      (m) => m[1]!,
+    );
+    expect(dates).toEqual([...dates].sort().reverse());
+  });
 });
 
 describe('youtube embeds', () => {
-  /** Source files that put a YouTube URL alone on a line. */
-  async function entriesWithVideo(): Promise<string[]> {
-    const hits: string[] = [];
-    for (const file of await diaryFiles()) {
-      const source = await readFile(join(diaryDir, file), 'utf8');
-      const body = source.split(/^---$/m).slice(2).join('---');
-      const standalone = body
-        .split('\n')
-        .some((l) => /^\s*https?:\/\/\S*(youtube\.com|youtu\.be)\S*\s*$/.test(l));
-      if (standalone) hits.push(file);
-    }
-    return hits;
-  }
+  it('embeds a player for every standalone YouTube URL in the diary', () => {
+    const expected = entries.flatMap((e) =>
+      e.lines
+        .map((l) => parseYouTube(l.trim()))
+        .filter((v): v is NonNullable<typeof v> => v !== null)
+        .map((v) => ({ file: e.file, verse: e.verse, id: v.id })),
+    );
 
-  it('embeds a player for every entry with a standalone YouTube URL', async () => {
-    const withVideo = await entriesWithVideo();
-    if (withVideo.length === 0) {
-      // No entry uses one yet. The parser itself is covered by youtube.test.ts;
-      // this activates the moment a diary entry includes a video.
-      expect(withVideo).toEqual([]);
-      return;
-    }
-
-    for (const dir of entryDirs) {
-      const html = await readFile(join(dist, dir, 'index.html'), 'utf8');
-      if (!/youtube\.com|youtu\.be/.test(html)) continue;
-      expect(html).toContain('youtube-nocookie.com/embed/');
-      expect(html).toContain('loading="lazy"');
+    for (const { file, verse, id } of expected) {
+      expect(verse, file).toContain(
+        `https://www.youtube-nocookie.com/embed/${id}`,
+      );
+      expect(verse, file).toContain('loading="lazy"');
     }
   });
 
-  it('never emits a block element that would split the verse paragraph', async () => {
-    for (const dir of entryDirs) {
-      const html = await readFile(join(dist, dir, 'index.html'), 'utf8');
+  it('never emits a block element that would split the verse paragraph', () => {
+    for (const e of entries) {
       // A <div> inside the single verse <p> would terminate the paragraph and
       // scatter the poem's line breaks.
-      expect(html).not.toContain('<div class="youtube"');
+      expect(e.verse, e.file).not.toContain('<div');
     }
   });
 });
